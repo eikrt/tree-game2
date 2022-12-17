@@ -8,7 +8,7 @@ impl RayCast {
         let mut i_p = None;
         for line in mesh.lines.iter() {
                 match Rect::new(start_point.x(), start_point.y(), 1, length)
-                    .intersect_line(line.points.0, line.points.1) {
+                    .intersect_line(line.get_points().0, line.get_points().1) {
                         Some(p) => i_p = Some(p),
                         None => {}
                     }
