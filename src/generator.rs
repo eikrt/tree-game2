@@ -15,6 +15,7 @@ impl Generator {
             points = ((points.1.0, points.1.1), (i as f32 * 12.0, 400.0 - p_val));
             lines.push(Line::new(
                 true,
+                1,
                 LineType::Dirt,
                 Color::RGB(100, 100, 55),
                 points,

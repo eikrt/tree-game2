@@ -89,6 +89,7 @@ fn handle_input(
                     Mesh {
                         lines: vec![Line::new(
                             true,
+                            0,
                             LineType::Branch,
                             Color::RGB(80, 65, 40),
                             (
