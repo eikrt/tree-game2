@@ -216,6 +216,7 @@ pub struct Mesh {
     pub lines: Vec<Line>,
 }
 
+
 /*fn ccw(a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
     (c.1 - a.1) * (b.0 - a.0) > (b.1 - a.1) * (c.0 - a.0)
 }

@@ -3,6 +3,7 @@ use rand::prelude::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Point;
 use sdl2::render::WindowCanvas;
+use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum EntityType {
     Tree,
@@ -10,6 +11,25 @@ pub enum EntityType {
     Ufo,
     Seed,
 }
+#[derive(Clone)]
+pub struct EntityGroup {
+    pub entities: HashMap<(i32,i32), HashMap<u32,Entity>>
+}
+impl EntityGroup {
+    pub fn insert_entity(&mut self, coords: (i32,i32), entity: Entity) {
+        let len: u32 = match self.entities.clone().get(&coords) {
+            Some(e) => {
+                e.len() as u32
+            }
+            None => {
+                self.entities.insert(coords, HashMap::new());
+                0
+            }
+        };
+        self.entities.get_mut(&coords).unwrap().insert(len+1, entity);
+    }
+}
+
 #[derive(Clone)]
 pub struct Entity {
     pub mesh: Mesh,

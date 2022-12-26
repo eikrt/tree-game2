@@ -39,7 +39,7 @@ fn main() -> Result<(), String> {
         Generator::generate_ufo((300.0, 300.0)),
         true,
     );
-    let mut entities = EntityGroup {
+    let entities = EntityGroup {
         entities: HashMap::new()
     };
     entities.insert_entity((0,0),player );
@@ -192,7 +192,7 @@ fn handle_input(
                     entities.entities.get_mut(&player_chunk_pos).unwrap().get_mut(&0).unwrap().mesh.lines[0].points.0 .1,
                 );
                 let entities_len = entities.entities.get(&player_chunk_pos).unwrap().values().len() as u32;
-                entities.entities.get_mut(&player_chunk_pos).unwrap().insert(
+                entities.entities.get_mut(&player_chunk_pos).insert(
                     entities_len + 1,
                     Entity::new(
                         EntityType::Seed,
