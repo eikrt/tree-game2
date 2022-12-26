@@ -19,6 +19,23 @@ impl Generator {
                 LineType::Dirt,
                 Color::RGB(100, 100, 55),
                 points,
+                false
+            ));
+
+        }
+        Mesh { lines: lines }
+    }
+    pub fn generate_ufo(pos: (f32,f32)) -> Mesh {
+        let mut lines = vec![];
+        for i in 0..4 {
+            let points = (pos, (pos.0 + i as f32 * 4.0, pos.1));
+            lines.push(Line::new(
+                true,
+                1,
+                LineType::Titanium,
+                Color::RGB(100, 0,0),
+                points,
+                false,
             ));
 
         }

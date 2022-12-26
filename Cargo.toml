@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 noise = "0.8.2"
 rand = "0.8.5"
+lerp = "0.4.0"
 [dependencies.sdl2]
 version = "0.32.1"
 default-features = false
