@@ -1,3 +1,5 @@
+use lerp::Lerp;
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::{MouseButton, MouseState};
@@ -8,8 +10,7 @@ use sdl2::render::WindowCanvas;
 use sdl2::EventPump;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use lerp::Lerp;
-use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
+use tree::consts_and_vars::*;
 use tree::entities::*;
 use tree::generator::*;
 use tree::geometry::*;
@@ -38,17 +39,20 @@ fn main() -> Result<(), String> {
         EntityType::Ufo,
         Generator::generate_ufo((300.0, 300.0)),
         true,
+        true,
     );
     let mut entities = EntityGroup {
-        entities: HashMap::new()
+        entities: HashMap::new(),
     };
-    entities.insert_entity((0,0),player );
-    
+
+    let player_clone = player.clone();
+    entities.insert_entity((0, 0), player);
+
     //entities.insert(0, player);
-    /*entities.insert(
-        entities.values().len() as u32 + 1,
-        Entity::new(EntityType::Terrain, Generator::generate_terrain(), false),
-    );*/
+    entities.insert_entity(
+        (0, 0),
+        Entity::new(EntityType::Terrain, Generator::generate_terrain(), true, false),
+    );
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
         channels: Some(1), // mono
@@ -68,30 +72,61 @@ fn main() -> Result<(), String> {
 
     let mut compare_time = SystemTime::now();
     let mut wasd = (false, false, false, false);
+    let mut camera = Camera::new();
     'running: loop {
         let delta_o = SystemTime::now().duration_since(compare_time).unwrap();
         compare_time = SystemTime::now();
 
         let delta = delta_o.as_millis() as u64;
         lifetime += delta;
-        let player_chunk_pos = (0,0);
+        println!("{}", delta);
+        //    let mut entities_hm = entities.entities.get_mut(&player_chunk_pos).unwrap();
+
+        //  let player = entities_hm.get_mut(&1).unwrap();
+        let player_pos = (
+            player_clone.mesh.lines[0].points.0 .0,
+            player_clone.mesh.lines[0].points.0 .1,
+        );
+        //let player_chunk_pos = ((player_pos.0 / CHUNK_SIZE as f32).floor() as i32, (player_pos.1 / CHUNK_SIZE as f32).floor() as i32);
+        let player_chunk_pos = (0, 0);
+        let player_relative_pos = (player_pos.0 - camera.pos.0, player_pos.1 - camera.pos.1);
         canvas.clear();
         let mouse_state = event_pump.mouse_state();
-        match handle_input(&mouse_state, &mut event_pump, &mut entities, &mut canvas, &mut wasd, player_chunk_pos) {
+        match handle_input(
+            &mouse_state,
+            &mut event_pump,
+            &mut entities,
+            &mut canvas,
+            &mut wasd,
+            player_chunk_pos,
+        ) {
             true => {}
             false => break 'running,
         }
-        for (id, e) in entities.entities.get_mut(&player_chunk_pos).unwrap().iter_mut() {
-            e.draw(&mut canvas);
+        for (id, e) in entities
+            .entities
+            .get_mut(&player_chunk_pos)
+            .unwrap()
+            .iter_mut()
+        {
+            e.draw(&mut canvas, &camera);
             e.tick(delta);
         }
 
         let collide_entities = entities.entities.get(&player_chunk_pos).unwrap().clone();
-        for (id, e) in entities.entities.get_mut(&player_chunk_pos).unwrap().iter_mut() {
-            if !e.is_collidable {
+        for (id, e) in entities
+            .entities
+            .get_mut(&player_chunk_pos)
+            .unwrap()
+            .iter_mut()
+        {
+            if !e.is_collide_agent {
                 continue;
             }
             for (other_id, other_e) in collide_entities.iter() {
+                if !other_e.is_collidable {
+                    continue;
+                }
                 if id == other_id {
                     continue;
                 }
@@ -113,18 +148,18 @@ fn handle_input(
     event_pump: &mut EventPump,
     entities: &mut EntityGroup,
     canvas: &mut WindowCanvas,
-    wasd: &mut (bool,bool,bool,bool),
-    player_chunk_pos: (i32,i32),
+    wasd: &mut (bool, bool, bool, bool),
+    player_chunk_pos: (i32, i32),
 ) -> bool {
     canvas.set_draw_color(Color::RGB(255, 0, 0));
     let mut intersect_point = Point::new(0, 0);
-    /*for (id, e) in entities.iter() {
-        intersect_point =
-            match RayCast::cast_ray(Point::new(mouse_state.x(), mouse_state.y()), 500, &e.mesh) {
-                Some(p) => p.1,
-                None => intersect_point,
-            }
-    }*/
+
+    let entities_len = entities
+        .entities
+        .get(&player_chunk_pos)
+        .unwrap()
+        .values()
+        .len() as u32;
     for event in event_pump.poll_iter() {
         match event {
             Event::Quit { .. }
@@ -187,12 +222,14 @@ fn handle_input(
                 keycode: Some(Keycode::Space),
                 ..
             } => {
+                let mut entities_hm = entities.entities.get_mut(&player_chunk_pos).unwrap();
+
+                let player = entities_hm.get_mut(&1).unwrap();
                 let middle_point = (
-                    entities.entities.get_mut(&player_chunk_pos).unwrap().get_mut(&0).unwrap().mesh.lines[0].points.0 .0,
-                    entities.entities.get_mut(&player_chunk_pos).unwrap().get_mut(&0).unwrap().mesh.lines[0].points.0 .1,
+                    player.mesh.lines[0].points.0 .0,
+                    player.mesh.lines[0].points.0 .1,
                 );
-                let entities_len = entities.entities.get(&player_chunk_pos).unwrap().values().len() as u32;
-                entities.entities.get_mut(&player_chunk_pos).unwrap().insert(
+                entities_hm.insert(
                     entities_len + 1,
                     Entity::new(
                         EntityType::Seed,
@@ -207,34 +244,37 @@ fn handle_input(
                             )],
                         },
                         true,
+                        true,
                     ),
                 );
             }
             Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
                 ..
-            } => {
-            }
+            } => {}
             _ => {}
         }
     }
+
+    let mut entities_hm = entities.entities.get_mut(&player_chunk_pos).unwrap();
+    let mut player = entities_hm.get_mut(&1).unwrap();
     if wasd.0 {
-   //     entities.get_mut(&0).unwrap().vel.1 = -50.4;
+        player.vel.1 = -150.4;
     }
     if wasd.1 {
-    //    entities.get_mut(&0).unwrap().vel.0 = -50.4;
+        player.vel.0 = -150.4;
     }
     if wasd.2 {
-    //    entities.get_mut(&0).unwrap().vel.1 = 50.4;
+        player.vel.1 = 150.4;
     }
     if wasd.3 {
-    //    entities.get_mut(&0).unwrap().vel.0 = 50.4;
+        player.vel.0 = 150.4;
     }
     if !wasd.0 && !wasd.2 {
-   //     entities.get_mut(&0).unwrap().vel.1 = entities.get_mut(&0).unwrap().vel.1.lerp(0.0, 0.01);
+        player.vel.1 = player.vel.1.lerp(0.0, 0.01);
     }
     if !wasd.1 && !wasd.3 {
-  //      entities.get_mut(&0).unwrap().vel.0 = entities.get_mut(&0).unwrap().vel.0.lerp(0.0, 0.01);
+        player.vel.0 = player.vel.0.lerp(0.0, 0.01);
     }
     true
 }
@@ -243,7 +283,7 @@ fn play_sound(lines: &Vec<Line>, sound_device: &AudioDevice<SquareWave>) {
         for p_q in &line.sound_queue {
             sound_device.resume();
         }
- play_sound(&line.leafs, sound_device);
+        play_sound(&line.leafs, sound_device);
     }
 }
 fn terminate_sound_if_empty(lines: &Vec<Line>, sound_device: &AudioDevice<SquareWave>) -> bool {

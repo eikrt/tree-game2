@@ -1,8 +1,15 @@
 use rand::Rng;
+use crate::entities::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Point;
 use sdl2::render::WindowCanvas;
 use crate::consts_and_vars::*;
+
+#[derive(Clone, PartialEq)]
+pub enum SignalType {
+    ConvertToTree,
+    Empty,
+}
 #[derive(Clone, PartialEq)]
 pub enum LineType {
     Branch,
@@ -31,6 +38,7 @@ pub struct Line {
     pub grow_change: u64,
     pub branch_time: u64,
     pub branch_change: u64,
+    pub signal: SignalType,
 }
 impl Line {
     pub fn new(
@@ -60,6 +68,7 @@ impl Line {
             grow_change: 0,
             branch_time: 500,
             branch_change: 0,
+            signal: SignalType::Empty
         }
     }
     pub fn tick(&mut self, delta: u64) {
@@ -154,27 +163,33 @@ impl Line {
             Point::new(self.points.1 .0 as i32, self.points.1 .1 as i32),
         )
     }
+    pub fn get_points_c(&self, camera: &Camera) -> (Point, Point) {
+        (
+            Point::new(self.points.0 .0 as i32 - camera.pos.0 as i32, self.points.0 .1 as i32 - camera.pos.1 as i32),
+            Point::new(self.points.1 .0 as i32 - camera.pos.0 as i32, self.points.1 .1 as i32 - camera.pos.1 as i32),
+        )
+    }
 
-    pub fn draw(&self, canvas: &mut WindowCanvas) {
+    pub fn draw(&self, canvas: &mut WindowCanvas, camera: &Camera) {
         if self.deleted {
             return;
         }
         canvas.set_draw_color(self.color);
-        canvas.draw_line(self.get_points().0, self.get_points().1);
+        canvas.draw_line(self.get_points_c(camera).0, self.get_points_c(camera).1);
         for leaf in &self.leafs {
-            leaf.draw(canvas);
+            leaf.draw(canvas, camera);
         }
     }
     pub fn collide(&mut self, other_l: &Line) {
-        for i in (0)..((self.step.1 * 100.0) as i32) {
+        for i in (0)..((self.step.1 * 10.0) as i32) {
             let intersects = intersect_line(
                 (
                     self.points.0 .0,
-                    self.points.0 .1 + self.step.1 as f32 / 100.0,
+                    self.points.0 .1 + self.step.1 as f32 / 10.0,
                 ),
                 (
                     self.points.1 .0,
-                    self.points.1 .1 + self.step.1 as f32 / 100.0,
+                    self.points.1 .1 + self.step.1 as f32 / 10.0,
                 ),
                 other_l.points.0,
                 other_l.points.1,
@@ -206,6 +221,7 @@ impl Line {
             LineType::Branch => {
                 self.affected_by_gravity = false;
                 self.line_type = LineType::Branch;
+                self.signal = SignalType::ConvertToTree;
             }
             _ => {}
         }
