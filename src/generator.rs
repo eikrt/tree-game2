@@ -9,9 +9,9 @@ impl Generator {
 
         let mut lines = vec![];
         let mut p_val = 0.0;
-        let planet_pos = (1000.0, 0.0);
-
         let r = 1024.0;
+
+        let planet_pos = (r, r);
         let mut points = (
             (
                 planet_pos.0 + 0.0_f32.cos() * r,
@@ -40,7 +40,7 @@ impl Generator {
                 false,
             ));
         }
-        Mesh { lines: lines }
+        Mesh::new(lines)
     }
     pub fn generate_ufo(pos: (f32, f32)) -> Mesh {
         let mut lines = vec![];
@@ -55,6 +55,18 @@ impl Generator {
                 false,
             ));
         }
-        Mesh { lines: lines }
+        Mesh::new(lines)
+    }
+    pub fn generate_seed(pos: (f32, f32)) -> Mesh {
+        let mut lines = vec![];
+        lines.push(Line::new(
+            true,
+            0,
+            LineType::Seed,
+            Color::RGB(80, 65, 40),
+            (pos, (pos.0 + 0.0, pos.1 - 4.0)),
+            true,
+        ));
+        Mesh::new(lines)
     }
 }

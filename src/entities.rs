@@ -40,6 +40,18 @@ impl Camera {
             vel: (0.0,0.0),
         } 
     }
+    pub fn tick(&mut self,delta: u64) {
+        self.trigger_move(delta);
+    }
+
+    pub fn trigger_move(&mut self, delta: u64) {
+        let step = (
+            (self.vel.0 * delta as f32) / 1000.0,
+            (self.vel.1 * delta as f32) / 1000.0,
+        );
+        self.pos.0 += step.0;
+        self.pos.1 += step.1;
+    }
 }
 #[derive(Clone)]
 pub struct Entity {
@@ -49,6 +61,7 @@ pub struct Entity {
     pub vel: (f32, f32),
     pub is_collidable: bool,
     pub is_collide_agent: bool,
+    pub gravity_points: Vec<(f32,f32)>
 }
 impl Entity {
     pub fn new(entity_type: EntityType, mesh: Mesh, is_collidable: bool, is_collide_agent: bool) -> Entity {
@@ -59,6 +72,7 @@ impl Entity {
             vel: (0.0, 0.0),
             is_collidable: is_collidable,
             is_collide_agent: is_collide_agent,
+            gravity_points: Vec::new(),
         }
     }
     pub fn tick(&mut self, delta: u64) {
@@ -79,6 +93,11 @@ impl Entity {
         for line in &self.mesh.lines {
             canvas.set_draw_color(line.color);
             line.draw(canvas, camera);
+        }
+    }
+    pub fn add_gravity_point(&mut self, point: (f32,f32)) {
+        for line in &mut self.mesh.lines {
+            line.add_gravity_point(point);
         }
     }
     pub fn collide(&mut self, other_entity: &Entity) {

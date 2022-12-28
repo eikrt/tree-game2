@@ -1,9 +1,9 @@
-use rand::Rng;
+use crate::consts_and_vars::*;
 use crate::entities::*;
+use rand::Rng;
 use sdl2::pixels::Color;
 use sdl2::rect::Point;
 use sdl2::render::WindowCanvas;
-use crate::consts_and_vars::*;
 
 #[derive(Clone, PartialEq)]
 pub enum SignalType {
@@ -32,6 +32,7 @@ pub struct Line {
     pub vel: (f32, f32),
     pub affected_by_gravity: bool,
     pub gravity_factor: f32,
+    pub gravity_points: Vec<(f32, f32)>,
     pub deleted: bool,
     pub step: (f32, f32),
     pub grow_time: u64,
@@ -61,6 +62,7 @@ impl Line {
             sound_queue: Vec::new(),
             vel: (0.0, 0.0),
             affected_by_gravity: affected_by_gravity,
+            gravity_points: Vec::new(),
             gravity_factor: 0.0,
             deleted: false,
             step: (0.0, 0.0),
@@ -68,7 +70,7 @@ impl Line {
             grow_change: 0,
             branch_time: 500,
             branch_change: 0,
-            signal: SignalType::Empty
+            signal: SignalType::Empty,
         }
     }
     pub fn tick(&mut self, delta: u64) {
@@ -78,7 +80,11 @@ impl Line {
         self.lifetime += delta;
         if self.affected_by_gravity {
             self.gravity_factor += GRAVITY;
-            self.vel.1 += self.gravity_factor;
+            for p in &self.gravity_points {
+                let angle = (self.points.0 .1 - p.1).atan2(self.points.0 .0 - p.0) + 3.14;
+                self.vel.0 += angle.cos() * self.gravity_factor;
+                self.vel.1 += angle.sin() * self.gravity_factor;
+            }
         }
         self.trigger_move(delta);
         for leaf in &mut self.leafs {
@@ -90,6 +96,12 @@ impl Line {
                 self.branch(delta);
             }
             _ => {}
+        }
+    }
+    pub fn add_gravity_point(&mut self, point: (f32, f32)) {
+        self.gravity_points.push(point);
+        for leaf in &mut self.leafs {
+            leaf.add_gravity_point(point);
         }
     }
     pub fn trigger_move(&mut self, delta: u64) {
@@ -106,8 +118,7 @@ impl Line {
         self.grow_change += delta;
         if self.grow_change > self.grow_time {
             self.grow_change = 0;
-        }
-        else {
+        } else {
             return;
         }
         if self.leafs.len() > 2 {
@@ -124,8 +135,7 @@ impl Line {
         self.branch_change += delta;
         if self.branch_change > self.branch_time {
             self.branch_change = 0;
-        }
-        else {
+        } else {
             return;
         }
         if self.generation > 3 {
@@ -165,8 +175,14 @@ impl Line {
     }
     pub fn get_points_c(&self, camera: &Camera) -> (Point, Point) {
         (
-            Point::new(self.points.0 .0 as i32 - camera.pos.0 as i32, self.points.0 .1 as i32 - camera.pos.1 as i32),
-            Point::new(self.points.1 .0 as i32 - camera.pos.0 as i32, self.points.1 .1 as i32 - camera.pos.1 as i32),
+            Point::new(
+                self.points.0 .0 as i32 - camera.pos.0 as i32,
+                self.points.0 .1 as i32 - camera.pos.1 as i32,
+            ),
+            Point::new(
+                self.points.1 .0 as i32 - camera.pos.0 as i32,
+                self.points.1 .1 as i32 - camera.pos.1 as i32,
+            ),
         )
     }
 
@@ -230,8 +246,28 @@ impl Line {
 #[derive(Clone)]
 pub struct Mesh {
     pub lines: Vec<Line>,
+    pub center_point: (f32, f32),
 }
-
+impl Mesh {
+    pub fn new(lines: Vec<Line>) -> Mesh {
+        let mut xs = 0.0;
+        let mut ys = 0.0; 
+        let mut i = 0.0;
+        for l in &lines {
+            xs += l.points.0.0;
+            ys += l.points.0.1;
+            xs += l.points.1.0;
+            ys += l.points.1.1;
+            i += 2.0;
+        }
+        xs /= i;
+        ys /= i;
+        Mesh {
+            lines: lines,
+            center_point: (xs, ys),
+        }
+    }
+}
 
 /*fn ccw(a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
     (c.1 - a.1) * (b.0 - a.0) > (b.1 - a.1) * (c.0 - a.0)

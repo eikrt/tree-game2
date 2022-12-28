@@ -35,7 +35,7 @@ fn main() -> Result<(), String> {
     let audio_subsystem = sdl_context.audio().unwrap();
     let mut entities: HashMap<u32, Entity> = HashMap::new();
     let mut selection_index = 0;
-    let player = Entity::new(
+    let mut player = Entity::new(
         EntityType::Ufo,
         Generator::generate_ufo((300.0, 300.0)),
         true,
@@ -44,15 +44,20 @@ fn main() -> Result<(), String> {
     let mut entities = EntityGroup {
         entities: HashMap::new(),
     };
-
-    let player_clone = player.clone();
     entities.insert_entity((0, 0), player);
 
     //entities.insert(0, player);
-    entities.insert_entity(
-        (0, 0),
-        Entity::new(EntityType::Terrain, Generator::generate_terrain(), true, false),
+    //
+    let mut gravity_points = Vec::new();
+    let mut home_planet = Entity::new(
+        EntityType::Terrain,
+        Generator::generate_terrain(),
+        true,
+        false,
     );
+
+    gravity_points.push(home_planet.mesh.center_point);
+    entities.insert_entity((0,0),home_planet);
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
         channels: Some(1), // mono
@@ -79,17 +84,18 @@ fn main() -> Result<(), String> {
 
         let delta = delta_o.as_millis() as u64;
         lifetime += delta;
-        println!("{}", delta);
-        //    let mut entities_hm = entities.entities.get_mut(&player_chunk_pos).unwrap();
 
-        //  let player = entities_hm.get_mut(&1).unwrap();
+        //let player_chunk_pos = ((player_pos.0 / CHUNK_SIZE as f32).floor() as i32, (player_pos.1 / CHUNK_SIZE as f32).floor() as i32);
+        let player_chunk_pos = (0, 0);
+        let mut entities_hm = entities.entities.get_mut(&player_chunk_pos).unwrap();
+
+        let player_clone = entities_hm.get_mut(&1).unwrap().clone();
         let player_pos = (
             player_clone.mesh.lines[0].points.0 .0,
             player_clone.mesh.lines[0].points.0 .1,
         );
-        //let player_chunk_pos = ((player_pos.0 / CHUNK_SIZE as f32).floor() as i32, (player_pos.1 / CHUNK_SIZE as f32).floor() as i32);
-        let player_chunk_pos = (0, 0);
         let player_relative_pos = (player_pos.0 - camera.pos.0, player_pos.1 - camera.pos.1);
+        camera.tick(delta);
         canvas.clear();
         let mouse_state = event_pump.mouse_state();
         match handle_input(
@@ -97,8 +103,10 @@ fn main() -> Result<(), String> {
             &mut event_pump,
             &mut entities,
             &mut canvas,
+            &mut camera,
             &mut wasd,
             player_chunk_pos,
+            &gravity_points,
         ) {
             true => {}
             false => break 'running,
@@ -148,8 +156,10 @@ fn handle_input(
     event_pump: &mut EventPump,
     entities: &mut EntityGroup,
     canvas: &mut WindowCanvas,
+    camera: &mut Camera,
     wasd: &mut (bool, bool, bool, bool),
     player_chunk_pos: (i32, i32),
+    gravity_points: &Vec<(f32, f32)>,
 ) -> bool {
     canvas.set_draw_color(Color::RGB(255, 0, 0));
     let mut intersect_point = Point::new(0, 0);
@@ -229,24 +239,17 @@ fn handle_input(
                     player.mesh.lines[0].points.0 .0,
                     player.mesh.lines[0].points.0 .1,
                 );
-                entities_hm.insert(
-                    entities_len + 1,
-                    Entity::new(
-                        EntityType::Seed,
-                        Mesh {
-                            lines: vec![Line::new(
-                                true,
-                                0,
-                                LineType::Seed,
-                                Color::RGB(80, 65, 40),
-                                (middle_point, (middle_point.0 + 0.0, middle_point.1 - 4.0)),
-                                true,
-                            )],
-                        },
-                        true,
-                        true,
-                    ),
+
+                let mut seed = Entity::new(
+                    EntityType::Seed,
+                    Generator::generate_seed(middle_point),
+                    true,
+                    true,
                 );
+                for g_p in gravity_points {
+                    seed.add_gravity_point((g_p.0, g_p.1));
+                }
+                entities_hm.insert(entities_hm.len() as u32 + 1, seed);
             }
             Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
@@ -258,23 +261,48 @@ fn handle_input(
 
     let mut entities_hm = entities.entities.get_mut(&player_chunk_pos).unwrap();
     let mut player = entities_hm.get_mut(&1).unwrap();
+
+    let player_pos = (
+        player.mesh.lines[0].points.0 .0,
+        player.mesh.lines[0].points.0 .1,
+    );
+    let player_relative_pos = (player_pos.0 - camera.pos.0, player_pos.1 - camera.pos.1);
     if wasd.0 {
         player.vel.1 = -150.4;
+
+        if player_relative_pos.1 < 200.0 {
+            camera.vel.1 = player.vel.1;
+        }
     }
     if wasd.1 {
         player.vel.0 = -150.4;
+
+        if player_relative_pos.0 < 200.0 {
+            camera.vel.0 = player.vel.0;
+        }
     }
     if wasd.2 {
         player.vel.1 = 150.4;
+
+        if player_relative_pos.1 > 400.0 {
+            camera.vel.1 = player.vel.1;
+        }
     }
     if wasd.3 {
         player.vel.0 = 150.4;
+
+        if player_relative_pos.0 > 600.0 {
+            camera.vel.0 = player.vel.0;
+        }
     }
     if !wasd.0 && !wasd.2 {
         player.vel.1 = player.vel.1.lerp(0.0, 0.01);
+        camera.vel.1 = player.vel.1;
     }
     if !wasd.1 && !wasd.3 {
         player.vel.0 = player.vel.0.lerp(0.0, 0.01);
+
+        camera.vel.0 = player.vel.0;
     }
     true
 }
