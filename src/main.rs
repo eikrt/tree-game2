@@ -57,7 +57,7 @@ fn main() -> Result<(), String> {
     );
 
     gravity_points.push(home_planet.mesh.center_point);
-    entities.insert_entity((0,0),home_planet);
+    entities.insert_entity((0, 0), home_planet);
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
         channels: Some(1), // mono
@@ -240,9 +240,15 @@ fn handle_input(
                     player.mesh.lines[0].points.0 .1,
                 );
 
+                let p = match gravity_points.last() {
+                    Some(s) => s.clone(),
+                    None => (0.0, 0.0),
+                };
+
+                let angle = (middle_point.1 - p.1).atan2(middle_point.0 - p.0);
                 let mut seed = Entity::new(
                     EntityType::Seed,
-                    Generator::generate_seed(middle_point),
+                    Generator::generate_seed(middle_point, angle),
                     true,
                     true,
                 );

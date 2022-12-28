@@ -38,6 +38,7 @@ impl Generator {
                 Color::RGB(100, 100, 55),
                 points,
                 false,
+                0.0,
             ));
         }
         Mesh::new(lines)
@@ -53,19 +54,21 @@ impl Generator {
                 Color::RGB(100, 0, 0),
                 points,
                 false,
+                0.0,
             ));
         }
         Mesh::new(lines)
     }
-    pub fn generate_seed(pos: (f32, f32)) -> Mesh {
+    pub fn generate_seed(pos: (f32, f32), angle: f32) -> Mesh {
         let mut lines = vec![];
         lines.push(Line::new(
             true,
             0,
             LineType::Seed,
             Color::RGB(80, 65, 40),
-            (pos, (pos.0 + 0.0, pos.1 - 4.0)),
+            (pos, (pos.0 + angle.cos() * 4.0, pos.1 + angle.sin() * 4.0)),
             true,
+            angle,
         ));
         Mesh::new(lines)
     }

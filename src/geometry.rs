@@ -40,6 +40,7 @@ pub struct Line {
     pub branch_time: u64,
     pub branch_change: u64,
     pub signal: SignalType,
+    pub grow_angle: f32,
 }
 impl Line {
     pub fn new(
@@ -49,6 +50,7 @@ impl Line {
         color: Color,
         points: ((f32, f32), (f32, f32)),
         affected_by_gravity: bool,
+        grow_angle: f32,
     ) -> Line {
         Line {
             color: color,
@@ -70,6 +72,7 @@ impl Line {
             grow_change: 0,
             branch_time: 500,
             branch_change: 0,
+            grow_angle: grow_angle,
             signal: SignalType::Empty,
         }
     }
@@ -125,11 +128,8 @@ impl Line {
             return;
         }
         self.grows += 1;
-        let grow_dir = (self.points.0 .1 - self.points.1 .1)
-            .atan2(self.points.1 .0 - self.points.0 .0)
-            + 3.14 / 2.0;
-        self.points.1 .0 += grow_dir.sin() * 2.0;
-        self.points.1 .1 += grow_dir.cos() * 2.0;
+        self.points.1 .0 += self.grow_angle.cos() * 2.0;
+        self.points.1 .1 += self.grow_angle.sin() * 2.0;
     }
     pub fn branch(&mut self, delta: u64) {
         self.branch_change += delta;
@@ -152,20 +152,35 @@ impl Line {
             line_type = LineType::Leaf;
         }
 
+        let gravity_points_clone = self.gravity_points.clone();
+        let p = match gravity_points_clone.last() {
+            Some(s) => s,
+            None => &(0.0, 0.0),
+        };
         let mut rng = rand::thread_rng();
-        let x: f32 = rng.gen_range(-4.0..4.0); // generates a float between 0 and 1
-        let y: f32 = rng.gen_range(0.0..4.0); // generates a float between 0 and 1
-        self.leafs.push(Line::new(
+        let grow_dir = (self.points.0 .1 - p.1).atan2(self.points.1 .0 - p.0)
+            + rng.gen_range((-3.14 / 4.0)..(3.14 / 4.0));
+        //let x: f32 = (grow_dir.cos()) * 2.0 + rng.gen_range(-1.0..1.0); // generates a float between 0 and 1
+        //let y: f32 = (grow_dir.sin()) * 2.0 + rng.gen_range(-1.0..1.0); // generates a float between 0 and 1
+        let x = 0.0;
+        let y = 0.0;
+
+        let mut new_line = Line::new(
             false,
             self.generation + 1,
             line_type,
             color,
             (
                 (self.points.1 .0, self.points.1 .1),
-                (self.points.1 .0 - x, self.points.1 .1 - y),
+                (self.points.1 .0 + x, self.points.1 .1 + y),
             ),
             self.affected_by_gravity,
-        ));
+            grow_dir,
+        );
+        for g_p in &self.gravity_points {
+            new_line.add_gravity_point((g_p.0, g_p.1));
+        }
+        self.leafs.push(new_line);
     }
     pub fn get_points(&self) -> (Point, Point) {
         (
@@ -197,15 +212,21 @@ impl Line {
         }
     }
     pub fn collide(&mut self, other_l: &Line) {
-        for i in (0)..((self.step.1 * 10.0) as i32) {
+        let gravity_points_clone = self.gravity_points.clone();
+        let p = match gravity_points_clone.last() {
+            Some(s) => s,
+            None => &(0.0, 0.0),
+        };
+        for i in (0)..((10.0) as i32) {
+            let angle = (self.points.0 .1 - p.1).atan2(self.points.0 .0 - p.0) + 3.14;
             let intersects = intersect_line(
                 (
-                    self.points.0 .0,
-                    self.points.0 .1 + self.step.1 as f32 / 10.0,
+                    self.points.0 .0 + angle.cos() * self.step.0 as f32 / 10.0,
+                    self.points.0 .1 + angle.sin() * self.step.1 as f32 / 10.0,
                 ),
                 (
-                    self.points.1 .0,
-                    self.points.1 .1 + self.step.1 as f32 / 10.0,
+                    self.points.0 .0 + angle.cos() * self.step.0 as f32 / 10.0,
+                    self.points.1 .1 + angle.sin() * self.step.1 as f32 / 10.0,
                 ),
                 other_l.points.0,
                 other_l.points.1,
@@ -251,13 +272,13 @@ pub struct Mesh {
 impl Mesh {
     pub fn new(lines: Vec<Line>) -> Mesh {
         let mut xs = 0.0;
-        let mut ys = 0.0; 
+        let mut ys = 0.0;
         let mut i = 0.0;
         for l in &lines {
-            xs += l.points.0.0;
-            ys += l.points.0.1;
-            xs += l.points.1.0;
-            ys += l.points.1.1;
+            xs += l.points.0 .0;
+            ys += l.points.0 .1;
+            xs += l.points.1 .0;
+            ys += l.points.1 .1;
             i += 2.0;
         }
         xs /= i;
